@@ -4,6 +4,7 @@
 #https://data36.com/web-scraping-tutorial-episode-1-scraping-a-webpage-with-bash/
 
 # Variable Def's
+# It would be nice if these were all in a config file, but this is just a quick script, so here we are.
 URL="https://www.nhl.com/news/nhl-lineup-projections-2025-26-season"
 CACHE="${HOME}/bin/.cache/nhl_lineup" # "base" location for all temp files
 RAW_HTML="${CACHE}/nhl_lineup.html"   # Pure HTML
@@ -484,14 +485,13 @@ print_schedule() {
 			echo "$line"
 			continue
 		fi
-
+		# Check if this line is a broadcast time line
 		broadcast_time "$line"
 		broadcast=$?
-		if [[ $broadcast -eq 0 ]]; then
+		if [[ $broadcast -eq 0 ]]; then	# Broadcast line, print it
 			echo -e "\t$line"
 		fi
 	done <"${CLEANED}"
-
 	echo ""
 
 }
