@@ -9,3 +9,19 @@ I'm far from any kind of programmer. Although I've been sitting infront of compu
 1. Get better at bash
 2. I like hockey
 
+## *Usage:*
+
+Usage: scraper [OPTIONS] <team_abbreviation|team_name>
+
+This script scrapes the NHL's website's projected lineup
+for todays games.  You can view the projected lineup for
+any team playing or view the day's schedule
+
+Options:"
+    -s              Print NHL Schedule for today
+    -h              Display this help message
+	
+	Examples:
+	    scraper STL           (using 3-letter abbreviation)
+	    scraper BLUES         (using full team name)
+	    scraper -s            (print NHL schedule)
