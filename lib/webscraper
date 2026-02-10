@@ -17,7 +17,10 @@ debug(){
     fi
 }
 
-check_depends() {
+check_depends() { # check for compatibility
+	# check to make sure the user can support all of necessary commands
+	# used.
+	# Also we'll check if we have the .cache dir available
     local cache=$1
 	# Ensure that we have the needed external commands installed.
 	if ! command -v html2text >/dev/null 2>&1; then
@@ -38,7 +41,7 @@ check_depends() {
 	return 0
 }
 
-print_usage() {
+print_usage() {	# Show usage / help
 	# HELP!
 	echo "Usage: ${0##*/} [OPTIONS] <team_abbreviation|team_name>"
 	echo ""
@@ -92,46 +95,46 @@ get_htmlfile() {    # URL HTMLFILE DEBUG RAW_HTML
 
 }
 
-html_to_text() {
+html_to_text() {	# Convert HTML to raw text
     local RAW_HTML=$1
-    local RAW_TEXT=$2
+    local raw_text=$2
 	
 	# Removes all of the HTML, java, etc from the curl'd web page
-	html2text -nobs -width 640 "${RAW_HTML}" >"${RAW_TEXT}"
+	html2text -nobs -width 640 "${RAW_HTML}" >"${raw_text}"
 
 }
 
-get_HTML_date() {
+get_HTML_date() {	# Grab the published date contained w/in the web page
 	# Get the date w/in the HTML file.  Appears that NHL.COM doesn't
 	# upload a new file if no games are scheduled, at least during the
 	# Olympics break.
 	# We'll use this date to determine if the file is valid or not.
 	local in_file=false
     local line
-    local RAW_TEXT=$1
-    local PUBLISHED_DATE=""
+    local raw_text=$1
+    local published_date=""
 
 	while read -r line; do
 		if [[ "${in_file}" == true ]]; then
-			PUBLISHED_DATE="${line}"
+			published_date="${line}"
 			break
 		fi
 		if [[ "$line" == "@NHLMedia" ]]; then
 			in_file=true
 		fi
 
-	done <"$RAW_TEXT"
-    echo "${PUBLISHED_DATE}"
+	done <"$raw_text"
+    echo "${published_date}"
     return 0
 }
 
-check_date() {
+check_date() {		# Check if published date > today
 	# Check the Published Date contained w/in the HTML with the current date.
 	# It seems that if no games are scheduled, NHL doesn't update the page.
 	# see 2026 Olympics
-    local PUBLISHED_DATE=$1
+    local published_date=$1
 	local date_file
-	date_file="$(date -d "${PUBLISHED_DATE}" "+%Y-%m-%d")"
+	date_file="$(date -d "${published_date}" "+%Y-%m-%d")"
 	local date_now
 	date_now="$(date +%F)"
 
@@ -141,15 +144,15 @@ check_date() {
 	return 0
 }
 
-remove_headers() {
+remove_headers() {	# Delete extra from text file that we don't want
 	# Remove all of the garage we don't from the Raw Text file
-	# Save the cleaned Raw Text to $CLEANED
+	# Save the cleaned Raw Text to $cleaned
 	# NOTE: The file still contains information, Status Report,
 	# that we don't want.  We'll remove that after splitting the
 	# files into separate game files for simplicity.
 
-    local RAW_TEXT=$1
-    local CLEANED=$2
+    local raw_text=$1
+    local cleaned=$2
 	# Delete everything from start of file up to and including header
 	local header="Fantasy Coverage"
 
@@ -157,19 +160,18 @@ remove_headers() {
 	local footer="Latest_News"
 
 	# UUOC No more!
-	# Stream RAW_TEXT from stdin, remove header, remove footer,
-	# remove first line and save the output to CLEANED
-	<"${RAW_TEXT}" sed -n '/'"${header}"'/,$p' |
+	# Stream raw_text from stdin, remove header, remove footer,
+	# remove first line and save the output to cleaned
+	<"${raw_text}" sed -n '/'"${header}"'/,$p' |
 		sed -n '/'"${footer}"'/q;p' |
-		tail -n+2 >"${CLEANED}"
+		tail -n+2 >"${cleaned}"
 
 }
 
-print_schedule() {
-	# Print today's NHL schedule
+print_schedule() {	# Print today's NHL schedule
 	# No need to print schedule for one team.  Just get the lineup,
 	# the schedule is printed at the top.
-    local CLEANED=$1
+    local cleaned=$1
 	local schedule
 	local broadcast
 	local line
@@ -181,9 +183,9 @@ print_schedule() {
 	echo "               ---------------------"
 
 	# Check file date.  Older than 1 day then skip.  No games
-	if ! [[ $(find "$CLEANED" -mtime +1) ]]; then
-		mapfile -t schedule < <(grep "\*\*\*\*\*" "${CLEANED}") # shellcheck
-		# mapfile -t "$schedule" < <(grep "\*\*\*\*\*" "${CLEANED}")
+	if ! [[ $(find "$cleaned" -mtime +1) ]]; then
+		mapfile -t schedule < <(grep "\*\*\*\*\*" "${cleaned}") # shellcheck
+		# mapfile -t "$schedule" < <(grep "\*\*\*\*\*" "${cleaned}")
 	fi
 
 	while IFS= read -r line; do
@@ -203,12 +205,12 @@ print_schedule() {
 		if [[ $broadcast -eq 0 ]]; then	# Broadcast line, print it
 			echo -e "\t$line"
 		fi
-	done <"${CLEANED}"
+	done <"${cleaned}"
 	echo ""
 
 }
 
-make_game_files() {
+make_game_files() {	# Make file per game being played
     # Split the cleaned text file into one file per game
     local cleaned=$1
     local gamefile=$2   # This probably should be hardcoded to game-
@@ -223,7 +225,7 @@ make_game_files() {
 
 }
 
-remove_status_report() {
+remove_status_report() {	# Remove all from Status Report to EOF
 	# Removes the status report from the bottom of all of game files
 
 	# ----------------------------------------------------------------
@@ -246,7 +248,7 @@ remove_status_report() {
 	done
 }
 
-resolve_team_name() {
+resolve_team_name() {	# Get team name for 3 letter abriviation
 	# Resolves a team name from either 3-letter abbreviation or full name
 	# If abbreviation (key) is provided, returns the long team name
 	# If full name is provided, returns it as-is
@@ -273,7 +275,7 @@ resolve_team_name() {
 	return 1
 }
 
-find_gamefile() {
+find_gamefile() {	# Find the game file for the supplied team
 	# This is a helper function to find the team we're interested in
 	# It will print the line number and the line itself
 	local team="$1"
@@ -285,7 +287,7 @@ find_gamefile() {
 	
 }
 
-print_game_info() {
+print_game_info() {	# Print the Lineup for the requested team
 	# Parse and print the game file with formatted output
 	# Initialize variables
 	local game_file="$1"
@@ -468,7 +470,7 @@ print_game_info() {
 	echo
 }
 
-broadcast_time() {
+broadcast_time() {	# Get the broadcast time from the game file
 	# Retrieve the game time from:
 	# Raw Text file :: Used with Schedule
 	# game-xx file  :: Used with lineup
@@ -482,17 +484,17 @@ broadcast_time() {
 
 }
 
-clean_cache() {
-	local CLEANED=$1
+clean_cache() {		# Cleanup the cache
+	local cleaned=$1
 	local GAMEFILE=$2
-	local RAW_TEXT=$3
+	local raw_text=$3
 	local RAW_HTML=$4
 	
 	# Remove all cached files
 	if [[ $DEBUG -eq 0 ]]; then
-		rm -f "${CLEANED}"
+		rm -f "${cleaned}"
 		rm -f "${GAMEFILE}"* # Delete the individual game files
-		rm -f "${RAW_TEXT}"  # Delete the raw text file
+		rm -f "${raw_text}"  # Delete the raw text file
 		rm -f "${RAW_HTML}"  # Delete the raw html file
 	fi
 }
