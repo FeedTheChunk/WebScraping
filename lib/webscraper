@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 #
 # FeedTheChunk
-# Lisence MIT
+# Licence MIT
 #
+# Thanks to Dave Eddy over at YSAP.  I've learned a lot from his videos
+# If you haven't checked him out, I recommend you give him a view.
+#
+
 # Helper functions for scraper
 
 debug(){
