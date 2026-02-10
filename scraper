@@ -110,7 +110,7 @@ main() {
 	done
 	shift $((OPTIND - 1))
 
-	debug "${DEBUG} getopts" # DEBUG
+	debug "[main] ${DEBUG} getopts" # DEBUG
 
 	# Curl HTML file
 	get_htmlfile "${url}" "${raw_html}" "${DEBUG}" "${htmlfile}"
@@ -138,31 +138,37 @@ main() {
 
 	# Remove header and footer from text file
 	remove_headers "${raw_text}" "${cleaned}"
+	debug "Removed headers and footers from text file." # DEBUG
 
 	# Show the schedule
 	if [[ ${show_schedule} -eq 1 ]]; then
 		print_schedule "${cleaned}"
-
+		debug "Printed schedule." # DEBUG
 	# Show the lineup for the requested team
 	else
 		# make 1 game file per scheduled game
 		make_game_files "${cleaned}" "${gamefile}"
-
+		debug "Created game files." # DEBUG
 		# Remove Status Report section from game files
 		remove_status_report "${cleaned}"
-
+		debug "Removed status report section from game files." # DEBUG
 		# Resolve the team name from abbreviation or full name
 		tm=$(resolve_team_name "$1")
-
+		debug "Resolved team name: ${tm}" # DEBUG
 		# Check if team was found (0 means invalid/misspelled)
 		if [[ "${tm}" == "0" ]]; then
 			echo
 			echo "Team not found: '$1'. Please check the spelling or use -h for available teams."
 			echo
 		else
-			game=$(find_gamefile "${tm}")
+			# find_gamefile "${tm}" "${gamefile}"
+			
+			local game=$(find_gamefile "${tm}" "${gamefile}")
 
+			debug "Found game file for game: ${game}" # DEBUG
 			if [[ ${game} ]]; then
+				debug "Printing game info for team: ${tm} from file: ${game}" # DEBUG
+				
 				print_game_info "${game}" "${tm}"
 			else
 				echo

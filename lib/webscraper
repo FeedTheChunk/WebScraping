@@ -9,7 +9,7 @@ debug(){
     # Debug function to print messages when DEBUG 
     # is enabled.
     if [[ $DEBUG -eq 1 ]]; then
-        echo "[DEBUG]: $1"
+        echo -e "[DEBUG]: $1\n"
     fi
 }
 
@@ -56,8 +56,7 @@ print_usage() {
 	local col=1 # No. of columns to print.
 	local count=0
     local -n teams_ref=$1
-    debug "teams_ref: ${!teams_ref[@]}" # DEBUG
-
+ 
 	for key in "${!teams_ref[@]}"; do
 		printf " %-20s" "${key}  ${teams_ref[$key]}"
 		((count++))
@@ -79,9 +78,7 @@ get_htmlfile() {    # URL HTMLFILE DEBUG RAW_HTML
     local DEBUG=$3
     local HTMLFILE=$4
     
-    debug "${DEBUG}" # DEBUG
-    debug "$HTMLFILE" # DEBUG
-	if [[ DEBUG -eq 0 ]]; then
+ 	if [[ DEBUG -eq 0 ]]; then
 		curl -s "${URL}" >"${RAW_HTML}"
 	else
 
@@ -94,6 +91,7 @@ get_htmlfile() {    # URL HTMLFILE DEBUG RAW_HTML
 html_to_text() {
     local RAW_HTML=$1
     local RAW_TEXT=$2
+	
 	# Removes all of the HTML, java, etc from the curl'd web page
 	html2text -nobs -width 640 "${RAW_HTML}" >"${RAW_TEXT}"
 
@@ -172,6 +170,7 @@ print_schedule() {
 	local broadcast
 	local line
 	local team
+
 	# Header
 	echo ""
 	echo "               Today's NHL Schedule:"
@@ -215,6 +214,7 @@ make_game_files() {
 	# 		Must create ever game file bc we need to grep each file to find
 	# 		the game we want the lineup for
 	local pat="\*\*\*\*\* "
+
 	csplit -s "${cleaned}" -f "${gamefile}" "/${pat}/" "{$(($(grep -c "${pat}" "${cleaned}") - 1))}"
 
 }
@@ -265,7 +265,7 @@ resolve_team_name() {
 	done
 
 	# Team not found (misspelled abbreviation or full name)
-	echo 0
+	# echo 0
 	return 1
 }
 
@@ -273,9 +273,12 @@ find_gamefile() {
 	# This is a helper function to find the team we're interested in
 	# It will print the line number and the line itself
 	local team="$1"
+	local gamefile="$2"
+
 	# Returns the name of file that contains the team name
 	# There should only ever be one file returned
-	grep -l "${team}" "${GAMEFILE}"*
+	grep -l "${team}" "${gamefile}"*
+	
 }
 
 print_game_info() {
@@ -480,7 +483,7 @@ clean_cache() {
 	local GAMEFILE=$2
 	local RAW_TEXT=$3
 	local RAW_HTML=$4
-	:
+	
 	# Remove all cached files
 	if [[ $DEBUG -eq 0 ]]; then
 		rm -f "${CLEANED}"
