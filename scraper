@@ -20,7 +20,7 @@ main() {
 	local raw_text="${script_dir}/.cache/nhl_lineup/nhl_lineup.txt"    # HTML removed
 	local gamefile="${script_dir}/.cache/nhl_lineup/game-"
 	local cleaned="${cache}/nhl_lineup.cleaned" # All the schedules in text format
-	local htmlfile="${HOME}/bin/nhl_lineup.html" # DEBUG
+	local htmlfile="${script_dir}/nhl_lineup.html" # html file used for debugging
 	local show_schedule=0	# Show tpday's schedule
 	local published_date="" # Date the HTML Page was Published
 	local DEBUG=0           # -d to enable debugging
