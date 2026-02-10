@@ -9,7 +9,7 @@
 
 # Helper functions for scraper
 
-debug(){
+debug(){	# Print DEBUG messages to stout
     # Debug function to print messages when DEBUG 
     # is enabled.
     if [[ $DEBUG -eq 1 ]]; then
