@@ -65,7 +65,8 @@ main() {
 	# DEBUGging w/in VSCODE
 	# set -- "-d" "DET"
 
-	check_depends "${cache}" # Are the necessary files installed / available?
+	# Are the necessary files installed / available?
+	check_depends "${cache}" 
 	status=$?
 	case $status in
 	1)	# Check if html2text is installed
@@ -87,8 +88,6 @@ main() {
 	esac
 
 	# Check if NO args where provided, show usage.
-	# I'd like to use getopts for this, but it doesn't handle the case where 
-	# no args are provided, so we'll just check for that first.
 	if [[ $# -eq 0 ]]; then
 		declare -p teams_long >/dev/null 2>&1 # Ensure the array exists
 		print_usage teams_long
@@ -97,17 +96,17 @@ main() {
 	# Parse all command line options
 	while getopts "hsd" opt; do
 		case $opt in
-		h)
+		h)	#print help / usage
 			declare -p teams_long >/dev/null 2>&1 # Ensure the array exists
 			print_usage teams_long
 			;;
-		s)
+		s)	# Show today's schedule
 			show_schedule=1 # Set a flag so we know to show the schedule
 			;;
-		d)
+		d)	# Debugging enabled
 			DEBUG=1
 			;;
-		*)
+		*)	#print help / usage
 			declare -p teams_long >/dev/null 2>&1 # Ensure the array exists
 			print_usage teams_long
 			;;
