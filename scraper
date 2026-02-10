@@ -1,24 +1,46 @@
 #!/usr/bin/env bash
 
 # REF: # I used this to get started with Web Scraping
-#https://data36.com/web-scraping-tutorial-episode-1-scraping-a-webpage-with-bash/
+#https://data36.com/web-scraping-tutorial-episode-1-scraping-a-webpage-with-bash/. ./lib/webscraper || true
 
-# Variable Def's
-# It would be nice if these were all in a config file, but this is just a quick script, so here we are.
-URL="https://www.nhl.com/news/nhl-lineup-projections-2025-26-season"
-CACHE="${HOME}/bin/.cache/nhl_lineup" # "base" location for all temp files
-RAW_HTML="${CACHE}/nhl_lineup.html"   # Pure HTML
-RAW_TEXT="${CACHE}/nhl_lineup.txt"    # HTML removed
-GAMEFILE="${CACHE}/game-"
-# All the schedules in text format, no htmi, no header or footer
-CLEANED="${CACHE}/nhl_lineup.cleaned"
-HTMLFILE="${HOME}/bin/nhl_lineup.html" # DEBUG
-SHOW_SCHEDULE=0
-PUBLISHED_DATE="" # Date the HTML Page was Published
-DEBUG=0           # -d to enable debugging
-# set -- "-d" "DET"	# DEBUGging w/in VSCODE
-# Associative array [team abbreviation]"team name"
-declare -A teams_long=(
+. ./lib/webscraper || true
+
+# Functions
+clean_cache() {
+	local CLEANED=$1
+	local GAMEFILE=$2
+	local RAW_TEXT=$3
+	local RAW_HTML=$4
+	:
+	# Remove all cached files
+	if [[ $DEBUG -eq 0 ]]; then
+		rm -f "${CLEANED}"
+		rm -f "${GAMEFILE}"* # Delete the individual game files
+		rm -f "${RAW_TEXT}"  # Delete the raw text file
+		rm -f "${RAW_HTML}"  # Delete the raw html file
+	fi
+}
+
+# Main
+main() {
+	# Variable Def's
+	# It would be nice if these were all in a config file, but this is just a quick script, so here we are.
+	local URL="https://www.nhl.com/news/nhl-lineup-projections-2025-26-season"
+	## We should use this to make the script more portable, but for now, we'll just use the home directory for caching
+	local SCRIPT_DIR="$(dirname "$(readlink -f "$0")")" 
+	local CACHE="${SCRIPT_DIR}/.cache/nhl_lineup" # "base" location for all temp files
+	local RAW_HTML="${SCRIPT_DIR}/.cache/nhl_lineup/nhl_lineup.html"   # Pure HTML
+	local RAW_TEXT="${SCRIPT_DIR}/.cache/nhl_lineup/nhl_lineup.txt"    # HTML removed
+	local GAMEFILE="${SCRIPT_DIR}/.cache/nhl_lineup/game-"
+	# All the schedules in text format, no htmi, no header or footer
+	local CLEANED="${CACHE}/nhl_lineup.cleaned"
+	local HTMLFILE="${HOME}/bin/nhl_lineup.html" # DEBUG
+	local SHOW_SCHEDULE=0
+	local PUBLISHED_DATE="" # Date the HTML Page was Published
+	local DEBUG=0           # -d to enable debugging
+	# set -- "-d" "DET"	# DEBUGging w/in VSCODE
+	# Associative array [team abbreviation]"team name"
+	declare -A teams_long=(
 	["COL"]="AVALANCHE"
 	["CHI"]="BLACKHAWKS"
 	["CBJ"]="BLUE JACKETS"
@@ -51,541 +73,120 @@ declare -A teams_long=(
 	["SJS"]="SHARKS"
 	["DAL"]="STARS"
 	["MIN"]="WILD"
-)
-
-check_depends() {
-	# Ensure that we have the needed external commands installed.
-	if ! command -v html2text >/dev/null 2>&1; then
-		return 1 # html2text is not installed
-	fi
-	# This is probably verbose
-	if ! command -v curl >/dev/null 2>&1; then
-		return 2 # no curl.  really?
-	fi
-	# How likely is it that someone is running bash <4 these days?
-	if ! type mapfile >/dev/null 2>&1; then
-		return 3 # mapfile older version of bash?
-	fi
-	return 0
-}
-
-get_htmlfile() {
-	if [[ DEBUG -eq 0 ]]; then
-		curl -s "${URL}" >"${RAW_HTML}"
-	else
-		# For debuggin use a local html file
-		$(cp "$HTMLFILE" "${RAW_HTML}") # DEBUG# DEBUG
-	fi
-
-}
-
-html_to_text() {
-	# Removes all of the HTML, java, etc from the curl'd web page
-	html2text -nobs -width 640 "${RAW_HTML}" >"${RAW_TEXT}"
-
-}
-
-remove_headers() {
-	# Remove all of the garage we don't from the Raw Text file
-	# Save the cleaned Raw Text to $CLEANED
-	# NOTE: The file still contains information, Status Report,
-	# that we don't want.  We'll remove that after splitting the
-	# files into separate game files for simplicity.
-
-	# Delete everything from start of file up to and including header
-	local header="Fantasy Coverage"
-
-	# Delete everything from footer to the EOF
-	local footer="Latest_News"
-
-	# UUOC No more!
-	# Stream RAW_TEXT from stdin, remove header, remove footer,
-	# remove first line and save the output to CLEANED
-	<"${RAW_TEXT}" sed -n '/'"${header}"'/,$p' |
-		sed -n '/'"${footer}"'/q;p' |
-		tail -n+2 >"${CLEANED}"
-
-}
-
-get_HTML_date() {
-	# Get the date w/in the HTML file.  Appears that NHL.COM doesn't
-	# upload a new file if no games are scheduled, at least during the
-	# Olympics break.
-	# We'll use this date to determine if the file is valid or not.
-	local in_file=false
-
-	while read -r line; do
-		if [[ "${in_file}" == true ]]; then
-			PUBLISHED_DATE="${line}"
-			break
-		fi
-		if [[ "$line" == "@NHLMedia" ]]; then
-			in_file=true
-		fi
-
-	done <"$RAW_TEXT"
-
-}
-
-check_date() {
-	# Check the Published Date contained w/in the HTML with the current date.
-	# It seems that if no games are scheduled, NHL doesn't update the page.
-	# see 2026 Olympics
-	local date_file
-	date_file="$(date -d "${PUBLISHED_DATE}" "+%Y-%m-%d")"
-	local date_now
-	date_now="$(date +%F)"
-
-	if [[ "$date_file" < "$date_now" ]]; then
-		return 1
-	fi
-	return 0
-}
-
-make_game_files() {
-	# Spit inputfile into 1 file per game / lineup
-	# 1) Creates one extra file game-00
-	# 2) It's adding 6 line feeds to the end of the files except for the last one
-	# 		Must create ever game file bc we need to grep each file to find
-	# 		the game we want the lineup for
-	local pat="\*\*\*\*\* "
-	csplit -s "${CLEANED}" -f "${GAMEFILE}" "/${pat}/" "{$(($(grep -c "${pat}" "${CLEANED}") - 1))}"
-
-}
-
-remove_status_report() {
-	# Removes the status report from the bottom of all of game files
-
-	# ----------------------------------------------------------------
-	# TODO -----------------------------------------------------------
-	# Probably should only do this for the game we are interested in.
-	# ----------------------------------------------------------------
-	local dir="${CLEANED%/*}" # Get just the path
-	local pat="game-*"        # Pattern to match files
-	local file
-	local str2find="Status report"
-
-	# Loop through each file matching the pattern
-	for file in "${dir}"/${pat}; do
-		# Check if it's a regular file
-		if [[ -f "$file" ]]; then
-			# Remove lines from str2find to end of file
-			sed -n -i '/'"${str2find}"'/q;p' "$file"
-		fi
-	done
-}
-
-resolve_team_name() {
-	# Resolves a team name from either 3-letter abbreviation or full name
-	# If abbreviation (key) is provided, returns the long team name
-	# If full name is provided, returns it as-is
-	# Returns 0 if neither abbreviation nor team name is found
-	local input="$1"
-	local input_upper="${input^^}" # Convert to uppercase
-
-	# Check if input is a key (3-letter abbreviation) in the teams_long array
-	if [[ -v teams_long["${input_upper}"] ]]; then
-		echo "${teams_long["${input_upper}"]}"
-		return 0
-	fi
-
-	# Check if input matches any full team name in the array
-	for team_name in "${teams_long[@]}"; do
-		if [[ "${team_name}" == "${input_upper}" ]]; then
-			echo "${input_upper}"
-			return 0
-		fi
-	done
-
-	# Team not found (misspelled abbreviation or full name)
-	echo 0
-	return 1
-}
-
-find_gamefile() {
-	# This is a helper function to find the team we're interested in
-	# It will print the line number and the line itself
-	local team="$1"
-	# Returns the name of file that contains the team name
-	# There should only ever be one file returned
-	grep -l "${team}" "${GAMEFILE}"*
-}
-
-broadcast_time() {
-	# Retrieve the game time from:
-	# Raw Text file :: Used with Schedule
-	# game-xx file  :: Used with lineup
-	local line=$1
-
-	if [[ "$line" =~ ^[0-9].*\.(m|M)\. ]]; then #line == broadcast time
-		return 0
-	else
-		return 1
-	fi
-
-}
-
-print_game_info() {
-	# Parse and print the game file with formatted output
-	# Initialize variables
-	local game_file="$1"
-	local team="$2"
-	local current_section=""
-	local in_injured_section=false
-	local in_scratched_section=false
-	local in_game=false
-	local player_count
-	local broadcast # 0=broadcast line 1=not a broadcast line
-
-	# Convert team to uppercase for case-insensitive comparison
-	team="${team^^}"
-
-	if [[ ! -f "${game_file}" ]]; then
-		echo "Game file not found: ${game_file}"
-		return 1
-	fi
-
-	echo
-
-	# Read the file and format it
-	while IFS= read -r line; do
-		# Sanitize input line: remove CR, control chars, DEL, and NBSP
-		line="${line//$'\r'/}"
-		line="${line//$'\u00A0'/ }"
-		line=$(printf '%s' "$line" | tr -d '\000-\037\177')
-
-		# Game header
-		if [[ "$line" =~ ^\*\*\*\*\* ]]; then
-			echo ""
-			echo "$line"
-			continue
-		fi
-
-		broadcast_time "$line"
-		broadcast=$?
-		if [[ "$broadcast" -eq 0 ]]; then
-			echo "$line"
-			echo ""
-			continue
-		fi
-
-		# Team lineup header
-		if [[ "$line" =~ "projected lineup" ]]; then
-			# If this is the team the user wants,
-			# set in_game flag to true and print the header,
-			# otherwise set it to false to skip until next game header
-			if [[ "${line^^}" =~ ^"${team^^}" ]]; then
-				in_game=true
-				echo ""
-				echo "$line"
-				# Underline the header with '-' repeated to match its length
-				local header_len=${#line}
-				local underline
-				underline=$(printf '%*s' "$header_len" '' | tr ' ' '-')
-				echo "$underline"
-
-				current_section=""
-				in_scratched_section=false
-				in_injured_section=false
-				continue
-			else
-				in_game=false
-				continue
-
-			fi
-		fi
-
-		# Scratched section
-		if [[ "$line" =~ ^Scratched ]] && [[ "$in_game" == true ]]; then
-			echo ""
-			echo "Scratched:"
-			current_section=""
-			# If the line contains player names after a colon, print them
-			local rest="${line#Scratched:}"
-			rest="${rest# }"
-			if [[ -n "${rest// /}" ]]; then
-				# split by ", " and print each on its own line
-				echo "${rest//, /$'\n'}"
-				in_scratched_section=false
-			else
-				in_scratched_section=true
-			fi
-			continue
-		fi
-
-		# Injured section
-		if [[ "$line" =~ ^Injured ]] && [[ "$in_game" == true ]]; then
-			echo ""
-			echo "Injured:"
-			current_section=""
-			# If the line contains player names after a colon, print them (stripping parentheticals)
-			local rest="${line#Injured:}"
-			rest="${rest# }"
-			if [[ -n "${rest// /}" ]]; then
-				rest="${rest// ([^)]*)/}"
-				# rest=$(echo "$rest" | sed 's/ ([^)]*)//g')
-				echo "${rest//, /$'\n'}"
-				in_injured_section=false
-			else
-				in_injured_section=true
-			fi
-			continue
-		fi
-
-		# Regular lines
-		# If we're currently in Injured or Scratched multi-line section, print players
-		if [[ "${in_injured_section}" == true || "${in_scratched_section}" == true ]]; then
-			if [[ -z "$line" ]]; then
-				in_injured_section=false
-				in_scratched_section=false
-				# preserve blank line
-				echo ""
-				continue
-			fi
-			# If this line is a new header, clear flags and let it be processed normally
-			if [[ "$line" =~ "projected lineup" ]] || [[ "$line" =~ ^\*\*\*\*\* ]] || [[ "$line" =~ ^[0-9].*\.(m|M)\. ]] || [[ "$line" =~ ^Scratched ]] || [[ "$line" =~ ^Injured ]]; then
-				in_injured_section=false
-				in_scratched_section=false
-				# fall through to normal processing
-			else
-				local player_line="$line"
-				if [[ "${in_injured_section}" == true ]]; then
-					player_line="${player_line// ([^)]*)/}"
-				fi
-				player_line="${player_line//, /$'\n'}"
-				echo "$player_line"
-				continue
-			fi
-
-		fi
-		if [[ -n "$line" ]] && [[ "$in_game" == true ]]; then
-			local formatted_line="$line"
-			# Replace " --- " with a newline
-			formatted_line="${formatted_line// -- /$'\n'}"
-
-			# Count the number of players (lines after splitting)
-			player_count=$(echo "$formatted_line" | grep -c .)
-
-			# If formated_line contains 3 players: Forwards section
-			if [[ $player_count -eq 3 ]]; then
-				if [[ "${current_section}" != "forwards" ]]; then
-					echo ""
-					echo "Forwards"
-					current_section="forwards"
-				fi
-			fi
-
-			# If formated_line contains 2 players: Defensemen section
-			if [[ $player_count -eq 2 ]]; then
-				if [[ "${current_section}" != "defensemen" ]]; then
-					echo ""
-					echo "Defensemen"
-					current_section="defensemen"
-				fi
-			fi
-
-			# If formated_line contains 1 player: Goaltenders section
-			if [[ $player_count -eq 1 ]] && [[ "${current_section}" != "goaltenders" ]]; then
-				echo ""
-				echo "Goalies"
-				current_section="goaltenders"
-
-			fi
-
-			# Check if we're leaving injured or scratched section (empty line or new section header)
-			if [[ -z "$formatted_line" ]] || [[ "$formatted_line" =~ ^[A-Z].* ]]; then
-				in_injured_section=false
-				in_scratched_section=false
-			fi
-
-			echo "$formatted_line"
-		elif [[ "$in_game" == true ]]; then
-			# Preserve blank lines
-			echo ""
-		fi
-	done <"$game_file"
-
-	echo
-}
-
-print_usage() {
-	# HELP!
-	echo "Usage: ${0##*/} [OPTIONS] <team_abbreviation|team_name>"
-	echo ""
-	echo " This script scrapes the NHL's website's projected lineup "
-	echo " for todays games.  You can view the projected lineup for "
-	echo " any team playing or view the day's schedule"
-	echo ""
-	echo "Options:"
-	echo "  -s              Print NHL Schedule for today"
-	echo "  -h              Display this help message"
-	echo ""
-	echo "Examples:"
-	echo "  ${0##*/} STL           (using 3-letter abbreviation)"
-	echo "  ${0##*/} BLUES         (using full team name)"
-	echo "  ${0##*/} -s            (print NHL schedule)"
-	echo ""
-	echo "Available teams:"
-
-	local col=1 # No. of columns to print.
-	local count=0
-
-	for key in "${!teams_long[@]}"; do
-		printf " %-20s" "${key}  ${teams_long[$key]}"
-		((count++))
-		if [ "$count" -eq $col ]; then
-			printf "\\n"
-			count=0
-		fi
-	done | sort -k2 # This only works for col=1
-	echo ""
-
-	exit 0
-}
-
-clean_cache() {
-	:
-	# Remove all cached files
-	if [[ $DEBUG -eq 0 ]]; then
-		rm -f "${CLEANED}"
-		rm -f "${GAMEFILE}"* # Delete the individual game files
-		rm -f "${RAW_TEXT}"  # Delete the raw text file
-		rm -f "${RAW_HTML}"  # Delete the raw html file
-	fi
-}
-
-print_schedule() {
-	# Print today's NHL schedule
-	# No need to print schedule for one team.  Just get the lineup,
-	# the schedule is printed at the top.
-
-	local schedule
-	local broadcast
-	local line
-	local team
-	# Header
-	echo ""
-	echo "               Today's NHL Schedule:"
-	echo "               ---------------------"
-
-	# Check file date.  Older than 1 day then skip.  No games
-	if ! [[ $(find "$CLEANED" -mtime +1) ]]; then
-		mapfile -t schedule < <(grep "\*\*\*\*\*" "${CLEANED}") # shellcheck
-		# mapfile -t "$schedule" < <(grep "\*\*\*\*\*" "${CLEANED}")
-	fi
-
-	while IFS= read -r line; do
-		# Sanitize input line: remove CR, control chars, DEL, and NBSP
-		line="${line//$'\r'/}"
-		line="${line//$'\u00A0'/ }"
-		line=$(printf '%s' "$line" | tr -d '\000-\037\177')
-
-		if [[ "$line" =~ ^\*\*\*\*\* ]]; then
-			echo ""
-			echo "$line"
-			continue
-		fi
-		# Check if this line is a broadcast time line
-		broadcast_time "$line"
-		broadcast=$?
-		if [[ $broadcast -eq 0 ]]; then	# Broadcast line, print it
-			echo -e "\t$line"
-		fi
-	done <"${CLEANED}"
-	echo ""
-
-}
-
-# Main
-clear
-check_depends # Are the necessary files installed / available?
-status=$?
-case $status in
-1)
-	echo "html2text not installed. sudo apt install html2text"
-	exit 1
-	;;
-2)
-	echo "curl not installed. sudo apt install curl"
-	exit 1
-	;;
-3)
-	echo "mapfile not found. Requires bash version 4 or higher."
-	exit 1
-	;;
-*) ;;
-esac
-
-# Check if NO args where provided, show usage.
-if [[ $# -eq 0 ]]; then
-	print_usage
-fi
-
-# Parse all command line options
-while getopts "hsd" opt; do
-	case $opt in
-	h)
-		print_usage
+	)
+	clear
+
+	check_depends "${CACHE}" # Are the necessary files installed / available?
+	status=$?
+	case $status in
+	1)	# Check if html2text is installed
+		echo "html2text not installed. sudo apt install html2text"
+		exit 1
 		;;
-	s)
-		SHOW_SCHEDULE=1 # Set a flag so we know to show the schedule
+	2)	# Check if curl is installed
+		echo "curl not installed. sudo apt install curl"
+		exit 1
 		;;
-	d)
-		DEBUG=1
+	3)	# BASH version check, we need version 4 or higher for mapfile
+		echo "mapfile not found. Requires bash version 4 or higher."
+		exit 1
 		;;
-	*)
-		print_usage
+	4)	# If the chache directory doesn't exist, create it
+		mkdir -p "${CACHE}"
 		;;
+	*) ;;
 	esac
-done
-shift $((OPTIND - 1))
 
-get_htmlfile  # Curl HTML file
-html_to_text  # Convert HTML file to Text file
-get_HTML_date # Pull html published date from w/in the HTML File
+	# Check if NO args where provided, show usage.
+	if [[ $# -eq 0 ]]; then
+		declare -p teams_long >/dev/null 2>&1 # Ensure the array exists
+		print_usage teams_long
+	fi
 
-if [[ $DEBUG -eq 0 ]]; then check_date; fi
+	# Parse all command line options
+	while getopts "hsd" opt; do
+		case $opt in
+		h)
+			declare -p teams_long >/dev/null 2>&1 # Ensure the array exists
+			print_usage teams_long
+			;;
+		s)
+			SHOW_SCHEDULE=1 # Set a flag so we know to show the schedule
+			;;
+		d)
+			DEBUG=1
+			;;
+		*)
+			declare -p teams_long >/dev/null 2>&1 # Ensure the array exists
+			print_usage teams_long
+			;;
+		esac
+	done
+	shift $((OPTIND - 1))
 
-status=$?
-if [[ $status -eq 1 ]]; then
-	echo ""
-	echo " No games currently scheduled for today."
-	echo ""
-	clean_cache
-	exit 0
-fi # Compare date in file with today's date
+	debug "${DEBUG} getopts" # DEBUG
 
-remove_headers # Remove header and footer from text file
+	# Curl HTML file
+	get_htmlfile "${URL}" "${RAW_HTML}" "${DEBUG}" "${HTMLFILE}"
 
-# Show the schedule
-if [[ ${SHOW_SCHEDULE} -eq 1 ]]; then
-	print_schedule
+	# Convert HTML file to Text file
+	html_to_text "${RAW_HTML}" "${RAW_TEXT}" 
 
-# Show the lineup for the requested team
-else
-	make_game_files # make 1 game file per scheduled game
-	remove_status_report
+	# Pull html published date from w/in the HTML File
+	PUBLISHED_DATE=$(get_HTML_date "$RAW_TEXT")
 
-	# Resolve the team name from abbreviation or full name
-	tm=$(resolve_team_name "$1")
+	debug "Published Date: ${PUBLISHED_DATE}" # DEBUG
 
-	# Check if team was found (0 means invalid/misspelled)
-	if [[ "${tm}" == "0" ]]; then
-		echo
-		echo "Team not found: '$1'. Please check the spelling or use -h for available teams."
-		echo
+	# Skip this check if we're debugging, we may be using an old HTML file
+	if [[ $DEBUG -eq 0 ]]; then 
+		check_date "$PUBLISHED_DATE";
+		status=$?
+		if [[ $status -eq 1 ]]; then
+			echo ""
+			echo " No games currently scheduled for today."
+			echo ""
+			clean_cache "${CLEANED}" "${GAMEFILE}" "${RAW_TEXT}" "${RAW_HTML}"
+			exit 0
+		fi # Compare date in file with today's date
+	fi
+
+	# Remove header and footer from text file
+	remove_headers "${RAW_TEXT}" "${CLEANED}"
+
+	# Show the schedule
+	if [[ ${SHOW_SCHEDULE} -eq 1 ]]; then
+		print_schedule "${CLEANED}"
+
+	# Show the lineup for the requested team
 	else
-		game=$(find_gamefile "${tm}")
+		# make 1 game file per scheduled game
+		make_game_files "${CLEANED}" "${GAMEFILE}"
 
-		if [[ ${game} ]]; then
-			print_game_info "${game}" "${tm}"
+		# Remove Status Report section from game files
+		remove_status_report "${CLEANED}"
+
+		# Resolve the team name from abbreviation or full name
+		tm=$(resolve_team_name "$1")
+
+		# Check if team was found (0 means invalid/misspelled)
+		if [[ "${tm}" == "0" ]]; then
+			echo
+			echo "Team not found: '$1'. Please check the spelling or use -h for available teams."
+			echo
 		else
-			echo
-			echo "${tm} are not playing today."
-			echo
+			game=$(find_gamefile "${tm}")
+
+			if [[ ${game} ]]; then
+				print_game_info "${game}" "${tm}"
+			else
+				echo
+				echo "${tm} are not playing today."
+				echo
+			fi
 		fi
 	fi
-fi
 
-clean_cache
-exit 0
+	exit 0
+}
+
+main "$@"
