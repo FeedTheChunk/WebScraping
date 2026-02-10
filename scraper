@@ -6,20 +6,7 @@
 . ./lib/webscraper || true
 
 # Functions
-clean_cache() {
-	local CLEANED=$1
-	local GAMEFILE=$2
-	local RAW_TEXT=$3
-	local RAW_HTML=$4
-	:
-	# Remove all cached files
-	if [[ $DEBUG -eq 0 ]]; then
-		rm -f "${CLEANED}"
-		rm -f "${GAMEFILE}"* # Delete the individual game files
-		rm -f "${RAW_TEXT}"  # Delete the raw text file
-		rm -f "${RAW_HTML}"  # Delete the raw html file
-	fi
-}
+
 
 # Main
 main() {
