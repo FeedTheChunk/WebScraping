@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 #
 # Thanks to Dave Eddy over at YSAP.  I've learned a lot from his videos
-# If you haven't checked out his content, I highly recommend it.
+# If you haven't checked him out, I recommend you give him a view.
 #
 # REF: # I used this to get started with learning Web Scraping
 # https://data36.com/web-scraping-tutorial-episode-1-scraping-a-webpage-with-bash/
-
+#
 # Load the helper functions
 . ./lib/webscraper || true
 
