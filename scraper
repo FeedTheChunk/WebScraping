@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
+#
+# Thanks to Dave Eddy over at YSAP.  I've learned a lot from his videos
+# If you haven't checked out his content, I highly recommend it.
+#
+# REF: # I used this to get started with learning Web Scraping
+# https://data36.com/web-scraping-tutorial-episode-1-scraping-a-webpage-with-bash/
 
-# REF: # I used this to get started with Web Scraping
-#https://data36.com/web-scraping-tutorial-episode-1-scraping-a-webpage-with-bash/. ./lib/webscraper || true
-
+# Load the helper functions
 . ./lib/webscraper || true
 
 # Main
@@ -168,7 +172,7 @@ main() {
 			debug "Found game file for game: ${game}" # DEBUG
 			if [[ ${game} ]]; then
 				debug "Printing game info for team: ${tm} from file: ${game}" # DEBUG
-				
+
 				print_game_info "${game}" "${tm}"
 			else
 				echo
