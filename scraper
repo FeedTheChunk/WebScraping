@@ -16,9 +16,9 @@ main() {
 	local url="https://www.nhl.com/news/nhl-lineup-projections-2025-26-season"
 	local script_dir="$(dirname "$(readlink -f "$0")")" 
 	local cache="${script_dir}/.cache/nhl_lineup" # "base" location for all temp files
-	local raw_html="${script_dir}/.cache/nhl_lineup/nhl_lineup.html"   # Pure HTML
-	local raw_text="${script_dir}/.cache/nhl_lineup/nhl_lineup.txt"    # HTML removed
-	local gamefile="${script_dir}/.cache/nhl_lineup/game-"
+	local raw_html="${cache}/nhl_lineup.html"   # Pure HTML
+	local raw_text="${cache}/nhl_lineup.txt"    # HTML removed
+	local gamefile="${cache}/game-"
 	local cleaned="${cache}/nhl_lineup.cleaned" # All the schedules in text format
 	local htmlfile="${script_dir}/nhl_lineup.html" # html file used for debugging
 	local show_schedule=0	# Show tpday's schedule
