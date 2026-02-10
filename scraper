@@ -5,27 +5,21 @@
 
 . ./lib/webscraper || true
 
-# Functions
-
-
 # Main
 main() {
 	# Variable Def's
-	# It would be nice if these were all in a config file, but this is just a quick script, so here we are.
-	local URL="https://www.nhl.com/news/nhl-lineup-projections-2025-26-season"
-	## We should use this to make the script more portable, but for now, we'll just use the home directory for caching
-	local SCRIPT_DIR="$(dirname "$(readlink -f "$0")")" 
-	local CACHE="${SCRIPT_DIR}/.cache/nhl_lineup" # "base" location for all temp files
-	local RAW_HTML="${SCRIPT_DIR}/.cache/nhl_lineup/nhl_lineup.html"   # Pure HTML
-	local RAW_TEXT="${SCRIPT_DIR}/.cache/nhl_lineup/nhl_lineup.txt"    # HTML removed
-	local GAMEFILE="${SCRIPT_DIR}/.cache/nhl_lineup/game-"
-	# All the schedules in text format, no htmi, no header or footer
-	local CLEANED="${CACHE}/nhl_lineup.cleaned"
-	local HTMLFILE="${HOME}/bin/nhl_lineup.html" # DEBUG
-	local SHOW_SCHEDULE=0
-	local PUBLISHED_DATE="" # Date the HTML Page was Published
+	# This years projected lineup
+	local url="https://www.nhl.com/news/nhl-lineup-projections-2025-26-season"
+	local script_dir="$(dirname "$(readlink -f "$0")")" 
+	local cache="${script_dir}/.cache/nhl_lineup" # "base" location for all temp files
+	local raw_html="${script_dir}/.cache/nhl_lineup/nhl_lineup.html"   # Pure HTML
+	local raw_text="${script_dir}/.cache/nhl_lineup/nhl_lineup.txt"    # HTML removed
+	local gamefile="${script_dir}/.cache/nhl_lineup/game-"
+	local cleaned="${cache}/nhl_lineup.cleaned" # All the schedules in text format
+	local htmlfile="${HOME}/bin/nhl_lineup.html" # DEBUG
+	local show_schedule=0	# Show tpday's schedule
+	local published_date="" # Date the HTML Page was Published
 	local DEBUG=0           # -d to enable debugging
-	# set -- "-d" "DET"	# DEBUGging w/in VSCODE
 	# Associative array [team abbreviation]"team name"
 	declare -A teams_long=(
 	["COL"]="AVALANCHE"
@@ -62,8 +56,11 @@ main() {
 	["MIN"]="WILD"
 	)
 	clear
+	
+	# DEBUGging w/in VSCODE
+	# set -- "-d" "DET"
 
-	check_depends "${CACHE}" # Are the necessary files installed / available?
+	check_depends "${cache}" # Are the necessary files installed / available?
 	status=$?
 	case $status in
 	1)	# Check if html2text is installed
@@ -79,12 +76,14 @@ main() {
 		exit 1
 		;;
 	4)	# If the chache directory doesn't exist, create it
-		mkdir -p "${CACHE}"
+		mkdir -p "${cache}"
 		;;
 	*) ;;
 	esac
 
 	# Check if NO args where provided, show usage.
+	# I'd like to use getopts for this, but it doesn't handle the case where 
+	# no args are provided, so we'll just check for that first.
 	if [[ $# -eq 0 ]]; then
 		declare -p teams_long >/dev/null 2>&1 # Ensure the array exists
 		print_usage teams_long
@@ -98,7 +97,7 @@ main() {
 			print_usage teams_long
 			;;
 		s)
-			SHOW_SCHEDULE=1 # Set a flag so we know to show the schedule
+			show_schedule=1 # Set a flag so we know to show the schedule
 			;;
 		d)
 			DEBUG=1
@@ -114,43 +113,43 @@ main() {
 	debug "${DEBUG} getopts" # DEBUG
 
 	# Curl HTML file
-	get_htmlfile "${URL}" "${RAW_HTML}" "${DEBUG}" "${HTMLFILE}"
+	get_htmlfile "${url}" "${raw_html}" "${DEBUG}" "${htmlfile}"
 
 	# Convert HTML file to Text file
-	html_to_text "${RAW_HTML}" "${RAW_TEXT}" 
+	html_to_text "${raw_html}" "${raw_text}" 
 
 	# Pull html published date from w/in the HTML File
-	PUBLISHED_DATE=$(get_HTML_date "$RAW_TEXT")
+	published_date=$(get_HTML_date "$raw_text")
 
-	debug "Published Date: ${PUBLISHED_DATE}" # DEBUG
+	debug "Published Date: ${published_date}" # DEBUG
 
 	# Skip this check if we're debugging, we may be using an old HTML file
 	if [[ $DEBUG -eq 0 ]]; then 
-		check_date "$PUBLISHED_DATE";
+		check_date "$published_date";
 		status=$?
 		if [[ $status -eq 1 ]]; then
 			echo ""
 			echo " No games currently scheduled for today."
 			echo ""
-			clean_cache "${CLEANED}" "${GAMEFILE}" "${RAW_TEXT}" "${RAW_HTML}"
+			clean_cache "${cleaned}" "${gamefile}" "${raw_text}" "${raw_html}"
 			exit 0
 		fi # Compare date in file with today's date
 	fi
 
 	# Remove header and footer from text file
-	remove_headers "${RAW_TEXT}" "${CLEANED}"
+	remove_headers "${raw_text}" "${cleaned}"
 
 	# Show the schedule
-	if [[ ${SHOW_SCHEDULE} -eq 1 ]]; then
-		print_schedule "${CLEANED}"
+	if [[ ${show_schedule} -eq 1 ]]; then
+		print_schedule "${cleaned}"
 
 	# Show the lineup for the requested team
 	else
 		# make 1 game file per scheduled game
-		make_game_files "${CLEANED}" "${GAMEFILE}"
+		make_game_files "${cleaned}" "${gamefile}"
 
 		# Remove Status Report section from game files
-		remove_status_report "${CLEANED}"
+		remove_status_report "${cleaned}"
 
 		# Resolve the team name from abbreviation or full name
 		tm=$(resolve_team_name "$1")
