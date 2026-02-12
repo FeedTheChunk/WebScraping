@@ -52,6 +52,7 @@ print_usage() {	# Show usage / help
 	echo "Options:"
 	echo "  -s              Print NHL Schedule for today"
 	echo "  -h              Display this help message"
+	echo "  -u              Display the current API URL being used"
 	echo ""
 	echo "Examples:"
 	echo "  ${0##*/} STL           (using 3-letter abbreviation)"
