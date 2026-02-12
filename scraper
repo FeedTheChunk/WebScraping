@@ -1,20 +1,25 @@
 #!/usr/bin/env bash
 #
+# Licence MIT
+#
 # Thanks to Dave Eddy over at YSAP.  I've learned a lot from his videos
 # If you haven't checked him out, I recommend you give him a view.
 #
 # REF: # I used this to get started with learning Web Scraping
 # https://data36.com/web-scraping-tutorial-episode-1-scraping-a-webpage-with-bash/
 #
+
+script_dir="$(dirname "$(readlink -f "$0")")" 
+
 # Load the helper functions
-. ./lib/webscraper || true
+. "${script_dir}"/lib/webscraper || true
 
 # Main
 main() {
 	# Variable Def's
 	# This years projected lineup
 	local url="https://www.nhl.com/news/nhl-lineup-projections-2025-26-season"
-	local script_dir="$(dirname "$(readlink -f "$0")")" 
+	# local script_dir="$(dirname "$(readlink -f "$0")")" 
 	local htmlfile="${script_dir}/nhl_lineup.html" # html file used for debugging
 	local cache="${script_dir}/.cache/nhl_lineup" # "base" location for all temp files
 	local raw_html="${cache}/nhl_lineup.html"   # Pure HTML
