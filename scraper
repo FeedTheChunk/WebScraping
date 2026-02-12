@@ -99,7 +99,7 @@ main() {
 	fi
 
 	# Parse all command line options
-	while getopts "hsd" opt; do
+	while getopts "hsdu" opt; do
 		case $opt in
 		h)	#print help / usage
 			declare -p teams_long >/dev/null 2>&1 # Ensure the array exists
@@ -110,6 +110,10 @@ main() {
 			;;
 		d)	# Debugging enabled
 			DEBUG=1
+			;;
+		u)	# Display api URL
+			echo "API URL: ${url}"
+			exit 0
 			;;
 		*)	#print help / usage
 			declare -p teams_long >/dev/null 2>&1 # Ensure the array exists
