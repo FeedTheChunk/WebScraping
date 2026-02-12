@@ -12,7 +12,7 @@
 script_dir="$(dirname "$(readlink -f "$0")")" 
 
 # Load the helper functions
-. "${script_dir}"/lib/webscraper || true
+. "${script_dir}"/lib/libscraper || true
 
 # Main
 main() {
