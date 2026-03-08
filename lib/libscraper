@@ -23,20 +23,15 @@ check_depends() { # check for compatibility
 	# Also we'll check if we have the .cache dir available
     local cache=$1
 	# Ensure that we have the needed external commands installed.
-	if ! command -v html2text >/dev/null 2>&1; then
-		return 1 # html2text is not installed
-	fi
+	! command -v html2text >/dev/null 2>&1 && return 1 # html2text is not installed
+	
 	# This is probably verbose
-	if ! command -v curl >/dev/null 2>&1; then
-		return 2 # no curl.  really?
-	fi
+	! command -v curl >/dev/null 2>&1 &&	return 2 # no curl.  really?
+	
 	# How likely is it that someone is running bash <4 these days?
-	if ! type mapfile >/dev/null 2>&1; then
-		return 3 # mapfile older version of bash?
-	fi
-    if [[ ! -d "${cache}" ]]; then
-        return 4 # cache directory doesn't exist
-    fi
+	! type mapfile >/dev/null 2>&1 && return 3 # mapfile older version of bash?
+	
+    [[ ! -d "${cache}" ]] && return 4 # cache directory doesn't exist
 
 	return 0
 }
@@ -139,9 +134,8 @@ check_date() {		# Check if published date > today
 	local date_now
 	date_now="$(date +%F)"
 
-	if [[ "$date_file" < "$date_now" ]]; then
-		return 1
-	fi
+	[[ "$date_file" < "$date_now" ]] && return 1
+
 	return 0
 }
 
@@ -202,10 +196,9 @@ print_schedule() {	# Print today's NHL schedule
 		fi
 		# Check if this line is a broadcast time line
 		broadcast_time "$line"
-		broadcast=$?
-		if [[ $broadcast -eq 0 ]]; then	# Broadcast line, print it
-			echo -e "\t$line"
-		fi
+		broadcast=$? # Broadcast line, print it
+		[[ $broadcast -eq 0 ]] && echo -e "\t$line" 
+		
 	done <"${cleaned}"
 	echo ""
 
