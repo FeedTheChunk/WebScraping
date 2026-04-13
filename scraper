@@ -144,8 +144,8 @@ main() {
 			echo ""
 			echo " No games currently scheduled for today."
 			echo ""
-			clean_cache "${cleaned}" "${gamefile}" "${raw_text}" "${raw_html}"
 			exit 0
+			clean_cache "${cleaned}" "${gamefile}" "${raw_text}" "${raw_html}"
 		fi # Compare date in file with today's date
 	fi
 
@@ -190,7 +190,7 @@ main() {
 			fi
 		fi
 	fi
-
+	clean_cache "${cleaned}" "${gamefile}" "${raw_text}" "${raw_html}"
 	exit 0
 }
 
